@@ -34,9 +34,9 @@
 
 ## 🎯 Problem Statement
 
-> *"In the real world, deploying large neural networks is often constrained by memory and computational budgets. A common technique to make models smaller and faster is pruning — where you remove less important weights or neurons after training. This challenge takes that idea a step further."*
+> *"In the real world, deploying large neural networks is often constrained by memory and computational budgets. A common technique to make models smaller and faster is pruning where you remove less important weights or neurons after training. This challenge takes that idea a step further."*
 
-The task is to build a feed-forward neural network that **learns to prune itself during training** — not as a post-training step. The network has a built-in mechanism to identify and dynamically remove its weakest connections by associating each weight with a learnable **gate parameter**.
+The task is to build a feed-forward neural network that **learns to prune itself during training** not as a post-training step. The network has a built in mechanism to identify and dynamically remove its weakest connections by associating each weight with a learnable **gate parameter**.
 
 **Dataset:** CIFAR-10 — 60,000 colour images (32×32), 10 classes, 50k train / 10k test.
 
@@ -51,10 +51,10 @@ Here's how it works:
 1. Every weight `w[i][j]` in the network is paired with a learnable **gate score** `s[i][j]`.
 2. A sigmoid function maps each gate score to a value between 0 and 1: `gate = σ(s)`.
 3. The actual weight used in the forward pass is `pruned_weight = w * gate`.
-4. When `gate → 0`, the corresponding weight contributes nothing — it's effectively **pruned**.
+4. When `gate → 0`, the corresponding weight contributes nothing it's effectively **pruned**.
 5. An **L1 sparsity penalty** on all gate values is added to the training loss, which continuously pushes gates toward zero unless the classification task forces them to stay open.
 
-The network ends up doing a gradient-descent-powered tug-of-war: the cross-entropy loss wants to keep useful gates open, while the sparsity loss wants to close all of them. The result is a naturally sparse network where only the most important connections survive.
+The network ends up doing a gradient descent powered tug-of-war: the cross entropy loss wants to keep useful gates open, while the sparsity loss wants to close all of them. The result is a naturally sparse network where only the most important connections survive.
 
 ---
 
@@ -107,7 +107,7 @@ Each `PrunableLinear` block carries **two** sets of learnable parameters: the st
 | Component | Description |
 |---|---|
 | `PrunableLinear` | Custom `nn.Module` replacing `nn.Linear`. Adds `gate_scores` as a second parameter tensor of the same shape as `weight`. Forward pass applies sigmoid gating before the linear operation. |
-| `SelfPruningNet` | 4-layer MLP using `PrunableLinear` layers with ReLU activations and Dropout for standard regularisation. |
+| `SelfPruningNet` | 4 layer MLP using `PrunableLinear` layers with ReLU activations and Dropout for standard regularisation. |
 | `sparsity_loss()` | Method on `SelfPruningNet` that computes the L1 norm (sum) of all gate values across all prunable layers. Used as the regularisation term during training. |
 | `run_experiment()` | Full training + evaluation loop for a given λ value. Tracks loss, accuracy, sparsity, and learning rate per epoch. |
 | λ (lambda) sweep | Three separate experiments with `λ ∈ {1e-5, 1e-4, 1e-3}` to show the sparsity-accuracy trade-off. |
@@ -323,13 +323,13 @@ This is a subtle but important distinction:
 | L2 (`Σ g²`) | `2g → 0` as `g → 0` | Shrinks values but rarely reaches exactly zero |
 | L1 (`Σ \|g\|`) | Constant `±1` | Provides a uniform "pull" toward zero, leading to exact sparsity |
 
-The constant gradient of the L1 norm means even a gate value of `0.001` still gets the same push toward zero as a gate value of `0.5`. This is precisely why L1 is the standard choice for inducing sparsity in machine learning — from Lasso regression all the way to modern neural network pruning.
+The constant gradient of the L1 norm means even a gate value of `0.001` still gets the same push toward zero as a gate value of `0.5`. This is precisely why L1 is the standard choice for inducing sparsity in machine learning from Lasso regression all the way to modern neural network pruning.
 
 **Backprop through the sparsity loss:**
 ```
 d(L_sparsity) / d(gate_scores[i,j]) = λ × σ(gate_scores[i,j]) × (1 − σ(gate_scores[i,j]))
 ```
-This gradient always pushes `gate_scores[i,j]` toward `−∞`, which drives `σ(gate_scores[i,j]) → 0`. The classification loss provides the counter-force: if a weight is useful, its contribution to reducing cross-entropy will keep its gate open.
+This gradient always pushes `gate_scores[i,j]` toward `−∞`, which drives `σ(gate_scores[i,j]) → 0`. The classification loss provides the counter force: if a weight is useful, its contribution to reducing cross-entropy will keep its gate open.
 
 ---
 
@@ -380,25 +380,25 @@ Three separate models are trained, one for each λ value:
 
 **Key observations:**
 
-- As λ increases, sparsity increases and accuracy decreases — this is the fundamental sparsity-accuracy trade-off.
+- As λ increases, sparsity increases and accuracy decreases this is the fundamental sparsity-accuracy trade-off.
 - The **medium λ = 1e-4** model typically represents the best practical trade-off: meaningful compression while retaining reasonable classification performance.
-- Even the high-λ model demonstrates that the self-pruning mechanism works correctly — the network successfully identifies and removes a large fraction of its own weights.
-- Per-layer analysis (Plot 3) usually shows that **earlier layers (wider layers)** are pruned more aggressively than later, narrower layers. This makes intuitive sense — wide early layers have more redundant capacity.
+- Even the high-λ model demonstrates that the self-pruning mechanism works correctly the network successfully identifies and removes a large fraction of its own weights.
+- Per layer analysis (Plot 3) usually shows that **earlier layers (wider layers)** are pruned more aggressively than later, narrower layers. This makes intuitive sense wide early layers have more redundant capacity.
 
 **Why does L1 on sigmoid gates create a bimodal distribution?**
 
-After training with a non-trivial λ, plotting gate values produces a characteristic bimodal histogram:
+After training with a non trivial λ, plotting gate values produces a characteristic bimodal histogram:
 - A large spike near `0.0` — connections the network decided to prune
 - A smaller cluster near `0.7–1.0` — connections the network decided to keep
 
-This bimodality is exactly what a successful pruning mechanism should produce. It indicates that gates have reached a near-binary decision state: either a connection is useful (gate ≈ 1) or it isn't (gate ≈ 0). A uniform or unimodal distribution would suggest the regularisation wasn't strong enough to drive any gates fully to zero.
+This bimodality is exactly what a successful pruning mechanism should produce. It indicates that gates have reached a near binary decision state: either a connection is useful (gate ≈ 1) or it isn't (gate ≈ 0). A uniform or unimodal distribution would suggest the regularisation wasn't strong enough to drive any gates fully to zero.
 
 ---
 
 ## 📈 Output Plots Explained
 
 ### `training_curves.png`
-Three panels showing epoch-by-epoch progression for all three λ values:
+Three panels showing epoch by epoch progression for all three λ values:
 - **Left:** Test accuracy over epochs — you should see λ = 1e-5 consistently on top
 - **Middle:** Sparsity level over epochs — watch how λ = 1e-3 aggressively prunes in early epochs
 - **Right:** Total training loss — includes both CE and sparsity components, so higher-λ models show higher raw loss values even at convergence
